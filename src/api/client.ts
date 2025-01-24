@@ -1,87 +1,38 @@
-import { Session } from '@supabase/supabase-js';
+import axios from 'axios';
 
-export interface App {
-  id: number;
-  name: string;
-  created_at: string;
-  updated_at: string;
-}
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-export interface APIKey {
-  id: number;
-  app_id: number;
-  key: string;
-  name: string;
-  created_at: string;
-  last_used?: string;
-}
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-class APIClient {
-  private baseUrl: string = '/api';
-  private session: Session | null = null;
+export const api = {
+  // Cards
+  createCard: async (title: string, content: string) => {
+    const response = await apiClient.post('/cards', { title, content });
+    return response.data;
+  },
+  getCards: async () => {
+    const response = await apiClient.get('/cards');
+    return response.data;
+  },
 
-  setSession(session: Session | null) {
-    this.session = session;
-  }
+  // Contacts
+  createContact: async (contactData: any) => {
+    const response = await apiClient.post('/contacts', contactData);
+    return response.data;
+  },
 
-  setBaseUrl(url: string) {
-    this.baseUrl = url;
-  }
-
-  private async fetch(endpoint: string, options: RequestInit = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(this.session && { Authorization: `Bearer ${this.session.access_token}` }),
-      ...options.headers,
-    };
-
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  // Apps
-  async listApps(): Promise<App[]> {
-    return this.fetch('/apps');
-  }
-
-  async createApp(name: string): Promise<App> {
-    return this.fetch('/apps', {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    });
-  }
-
-  async deleteApp(id: number): Promise<void> {
-    await this.fetch(`/apps/${id}`, { method: 'DELETE' });
-  }
-
-  // API Keys
-  async listAppKeys(appId: number): Promise<APIKey[]> {
-    return this.fetch(`/apps/${appId}/keys`);
-  }
-
-  async createApiKey(appId: number, name: string): Promise<APIKey> {
-    return this.fetch(`/apps/${appId}/keys`, {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    });
-  }
-
-  async deleteApiKeys(appId: number, keys: string[]): Promise<void> {
-    await this.fetch(`/apps/${appId}/keys/delete`, {
-      method: 'POST',
-      body: JSON.stringify({ keys }),
-    });
-  }
-}
-
-export const apiClient = new APIClient();
-apiClient.setBaseUrl(import.meta.env.VITE_SERVER_URL + '/api');
+  // Sends
+  createSend: async (cardId: number, contactId: string) => {
+    const response = await apiClient.post('/sends', { cardId, contactId });
+    return response.data;
+  },
+  getSends: async () => {
+    const response = await apiClient.get('/sends');
+    return response.data;
+  },
+};

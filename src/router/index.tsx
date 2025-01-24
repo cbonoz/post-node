@@ -8,6 +8,8 @@ import AuthProtectedRoute from "./AuthProtectedRoute.tsx";
 import Providers from "../Providers.tsx";
 import AppsPage from '../pages/apps/AppsPage.tsx';
 import AppDetailPage from '../pages/apps/AppDetailPage.tsx';
+import CardCreatePage from '../pages/cards/CardCreatePage.tsx';
+import CardSendPage from '../pages/cards/CardSendPage.tsx';
 
 const router = createBrowserRouter([
   // I recommend you reflect the routes here in the pages folder
@@ -38,14 +40,21 @@ const router = createBrowserRouter([
             element: <ProtectedPage />,
           },
           {
-            path: "/apps",
+            path: "/cards",
             element: <AppsPage/>
           },
           {
             path: "/apps/:id",
             element: <AppDetailPage/>
+          },
+          {
+            path: "/cards/create",
+            element: <CardCreatePage />
+          },
+          {
+            path: "/cards/send",
+            element: <CardSendPage />
           }
-
         ],
       },
     ],
