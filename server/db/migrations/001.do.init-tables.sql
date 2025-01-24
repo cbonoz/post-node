@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE contacts (
     id SERIAL PRIMARY KEY,
     contactId TEXT,
-    userId uuid REFERENCES users(id),
+    userId uuid,
     firstName TEXT,
     lastName TEXT,
     addressLine1 TEXT,
@@ -12,14 +12,14 @@ CREATE TABLE contacts (
     provinceOrState TEXT,
     postalOrZip TEXT,
     country TEXT,
-    countryCode TEXT
+    countryCode TEXT,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE cards (
     id SERIAL PRIMARY KEY,
-    userId uuid REFERENCES users(id),
+    userId uuid,
     title TEXT,
     content TEXT,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -28,7 +28,7 @@ CREATE TABLE cards (
 
 CREATE TABLE sends (
     id SERIAL PRIMARY KEY,
-    senderUserId uuid REFERENCES users(id),
+    senderUserId uuid,
     contactId INTEGER REFERENCES contacts(id),
     cardId INTEGER REFERENCES cards(id),
     status TEXT,

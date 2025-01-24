@@ -3,7 +3,6 @@ import pg from 'pg';
 import Postgrator from 'postgrator';
 import path from 'node:path';
 import { Kysely, PostgresDialect } from 'kysely';
-import { Pool } from 'pg';
 import { Database } from '../types/models';
 
 import { DB_CONNECTION_STRING } from '../constants';

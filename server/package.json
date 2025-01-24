@@ -1,16 +1,20 @@
 {
-  "name": "writer-api",
+  "name": "post-api",
   "version": "1.0.0",
-  "description": "Writer api server",
-  "main": "index.ts",
+  "description": "Post api server",
+  "main": "server.ts",
   "scripts": {
-    "start": "fastify start",
+    "start": "npx ts-node server.ts",
+    "build": "tsc",
+    "build-prod": "tsc --outDir dist",
+    "start-prod": "NODE_ENV=prod node dist/server.js",
     "test": "yarn test"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",
+    "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
     "kysely": "^0.27.5",
     "pg": "^8.13.1",
@@ -25,6 +29,7 @@
   "keywords": [],
   "devDependencies": {
     "@types/node": "^22.10.10",
+    "@types/pg": "^8.11.11",
     "typescript": "^5.7.3"
   }
 }

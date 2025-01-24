@@ -20,10 +20,7 @@ export async function registerRoutes(app: FastifyInstance) {
   }>(
     '/cards',
     {
-      preHandler: app.authenticate,
-      schema: {
-        body: createCardSchema
-      }
+      preHandler: app.authenticate
     },
     async (request, reply) => {
       try {
@@ -72,10 +69,7 @@ export async function registerRoutes(app: FastifyInstance) {
   }>(
     '/contacts',
     {
-      preHandler: app.authenticate,
-      schema: {
-        body: createContactSchema
-      }
+      preHandler: app.authenticate
     },
     async (request, reply) => {
       try {
@@ -100,10 +94,7 @@ export async function registerRoutes(app: FastifyInstance) {
   }>(
     '/sends',
     {
-      preHandler: app.authenticate,
-      schema: {
-        body: createSendSchema
-      }
+      preHandler: app.authenticate
     },
     async (request, reply) => {
       try {
