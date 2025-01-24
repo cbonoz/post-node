@@ -1,169 +1,197 @@
-import { FastifyInstance } from 'fastify'
-import { pgClient } from '../db'
-import { CreateAddressBody, CreateCardBody, CreateSendBody } from '../types/dto'
-import { createCardSchema, createAddressSchema, createSendSchema } from '../schemas'
-import { sendPostcard } from '../services/postgrid'
+import { FastifyInstance } from 'fastify';
+import { db } from '../db';
+import {
+  CreateContactBody,
+  CreateCardBody,
+  CreateSendBody
+} from '../types/dto';
+import {
+  createCardSchema,
+  createContactSchema,
+  createSendSchema
+} from '../schemas';
+import { sendPostcard } from '../services/postgrid';
+import { createContactFromAddress } from '../services/converters';
+import { sendError } from '../lib/util/errors';
 
 export async function registerRoutes(app: FastifyInstance) {
-    app.post<{
-        Body: CreateCardBody
-    }>(
-        '/cards',
-        {
-            preHandler: app.authenticate,
-            schema: {
-                body: createCardSchema
-            }
-        },
-        async (request, reply) => {
-            try {
-                const { title, content } = request.body
-                const userId = request.user.id
+  app.post<{
+    Body: CreateCardBody;
+  }>(
+    '/cards',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        body: createCardSchema
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { title, content } = request.body;
+        const userId = request.user.id;
 
-                const [card] = await pgClient`
-                    INSERT INTO cards (title, content, userId)
-                    VALUES (${title}, ${content}, ${userId})
-                    RETURNING *
-                `
-                reply.send(card)
-            } catch (error) {
-                reply.status(500).send({ error: error.message })
-            }
+        const card = await db
+          .insertInto('cards')
+          .values({
+            title,
+            content,
+            userId
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        reply.send(card);
+      } catch (error) {
+        sendError(reply, error);
+      }
+    }
+  );
+
+  app.get(
+    '/cards',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      try {
+        const userId = request.user.id;
+        const cards = await db
+          .selectFrom('cards')
+          .selectAll()
+          .where('userId', '=', userId)
+          .orderBy('createdAt', 'desc')
+          .execute();
+
+        reply.send(cards);
+      } catch (error) {
+        sendError(reply, error);
+      }
+    }
+  );
+
+  app.post<{
+    Body: CreateContactBody;
+  }>(
+    '/contacts',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        body: createContactSchema
+      }
+    },
+    async (request, reply) => {
+      try {
+        const contact = await db
+          .insertInto('contacts')
+          .values({
+            ...request.body,
+            userId: request.user.id
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        reply.send(contact);
+      } catch (error) {
+        sendError(reply, error);
+      }
+    }
+  );
+
+  app.post<{
+    Body: CreateSendBody;
+  }>(
+    '/sends',
+    {
+      preHandler: app.authenticate,
+      schema: {
+        body: createSendSchema
+      }
+    },
+    async (request, reply) => {
+      try {
+        const { cardId, contactId } = request.body;
+        const userId = request.user.id;
+
+        // Get card and contact details
+        const card = await db
+          .selectFrom('cards')
+          .selectAll()
+          .where('id', '=', cardId)
+          .where('userId', '=', userId)
+          .executeTakeFirst();
+
+        if (!card) {
+          reply.status(404).send({ error: 'Card not found' });
+          return;
         }
-    )
 
-    app.get(
-        '/cards',
-        { preHandler: app.authenticate },
-        async (request, reply) => {
-            try {
-                const userId = request.user.id
-                const cards = await pgClient`
-                    SELECT * FROM cards
-                    WHERE userId = ${userId}
-                    ORDER BY createdAt DESC
-                `
-                reply.send(cards)
-            } catch (error) {
-                reply.status(500).send({ error: error.message })
-            }
+        const toContact = await db
+          .selectFrom('contacts')
+          .selectAll()
+          .where('contactId', '=', contactId)
+          .executeTakeFirst();
+
+        if (!toContact) {
+          reply.status(404).send({ error: 'Contact recipient not found' });
+          return;
         }
-    )
 
-    app.post<{
-        Body: CreateAddressBody
-    }>(
-        '/addresses',
-        {
-            preHandler: app.authenticate,
-            schema: {
-                body: createAddressSchema
-            }
-        },
-        async (request, reply) => {
-            try {
-                const { recipientName, street, city, state, zipCode, country } = request.body
+        const fromContact = await db
+          .selectFrom('contacts')
+          .selectAll()
+          .where('userId', '=', userId)
+          .executeTakeFirst();
 
-                const [address] = await pgClient`
-                    INSERT INTO addresses (recipientName, street, city, state, zipCode, country)
-                    VALUES (${recipientName}, ${street}, ${city}, ${state}, ${zipCode}, ${country})
-                    RETURNING *
-                `
-                reply.send(address)
-            } catch (error) {
-                reply.status(500).send({ error: error.message })
-            }
+        if (!fromContact) {
+          reply.status(404).send({ error: 'From contact not found' });
+          return;
         }
-    )
 
-    app.post<{
-        Body: CreateSendBody
-    }>(
-        '/sends',
-        {
-            preHandler: app.authenticate,
-            schema: {
-                body: createSendSchema
-            }
-        },
-        async (request, reply) => {
-            try {
-                const { cardId, addressId } = request.body
-                const userId = request.user.id
+        // Send via PostGrid
+        const letter = await sendPostcard(
+          card.title,
+          card.content,
+          createContactFromAddress(fromContact),
+          createContactFromAddress(toContact)
+        );
 
-                // Get card and address details
-                const [card] = await pgClient`
-                    SELECT * FROM cards WHERE id = ${cardId} AND userId = ${userId}
-                `
-                if (!card) {
-                    reply.status(404).send({ error: 'Card not found' })
-                    return
-                }
+        // Record the send
+        const send = await db
+          .insertInto('sends')
+          .values({
+            cardId,
+            contactId,
+            userId
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
 
-                const [address] = await pgClient`
-                    SELECT * FROM addresses WHERE id = ${addressId}
-                `
-                if (!address) {
-                    reply.status(404).send({ error: 'Address not found' })
-                    return
-                }
+        reply.send({
+          ...send
+        });
+      } catch (error) {
+        sendError(reply, error);
+      }
+    }
+  );
 
-                const fromContact = 
+  app.get(
+    '/sends',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      try {
+        const userId = request.user.id;
+        const sends = await db
+          .selectFrom('sends')
+          .innerJoin('cards', 'cards.id', 'sends.cardId')
+          .innerJoin('contacts', 'contacts.id', 'sends.contactId')
+          .selectAll()
+          .where('sends.userId', '=', userId)
+          .orderBy('sends.sentAt', 'desc')
+          .execute();
 
-                // Send via PostGrid
-                const letter = await sendPostcard(card.title, card.content, fromContact, toContact)
-
-                // Record the send
-                const [send] = await pgClient`
-                    INSERT INTO sends (
-                        senderUserId,
-                        addressId,
-                        cardId,
-                        postGridId,
-                        status,
-                        expectedDeliveryDate
-                    )
-                    VALUES (
-                        ${userId},
-                        ${addressId},
-                        ${cardId},
-                        ${letter.id},
-                        ${letter.status},
-                        ${letter.expectedDeliveryDate}
-                    )
-                    RETURNING *
-                `
-
-                reply.send({
-                    ...send,
-                    tracking: letter.tracking,
-                    status: letter.status,
-                    expectedDeliveryDate: letter.expectedDeliveryDate
-                })
-            } catch (error) {
-                reply.status(500).send({ error: error.message })
-            }
-        }
-    )
-
-    app.get(
-        '/sends',
-        { preHandler: app.authenticate },
-        async (request, reply) => {
-            try {
-                const userId = request.user.id
-                const sends = await pgClient`
-                    SELECT s.*, c.title, c.content, a.*
-                    FROM sends s
-                    JOIN cards c ON s.cardId = c.id
-                    JOIN addresses a ON s.addressId = a.id
-                    WHERE s.senderUserId = ${userId}
-                    ORDER BY s.sentAt DESC
-                `
-                reply.send(sends)
-            } catch (error) {
-                reply.status(500).send({ error: error.message })
-            }
-        }
-    )
+        reply.send(sends);
+      } catch (error) {
+        sendError(reply, error);
+      }
+    }
+  );
 }
