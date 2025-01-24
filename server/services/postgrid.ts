@@ -4,6 +4,7 @@ import { Contact } from 'postgrid-node-client/build/contact'
 
 const postGrid = new PostGrid(process.env.POSTGRID_API_KEY!)
 
+// https://github.com/flexbase-eng/postgrid-node-client
 export async function sendPostcard(title: string, content: string, from: Contact, to: Contact) {
     try {
         const letter = await postGrid.letter.create({
