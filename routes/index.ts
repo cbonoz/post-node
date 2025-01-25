@@ -10,7 +10,7 @@ import {
   createContactSchema,
   createSendSchema
 } from '../schemas';
-import { sendPostcard } from '../services/postgrid';
+import { createLetter } from '../services/postgrid';
 import { createContactFromAddress } from '../services/converters';
 import { sendError } from '../lib/util/errors';
 
@@ -136,13 +136,15 @@ export async function registerRoutes(app: FastifyInstance) {
           return;
         }
 
-        // Send via PostGrid
-        const letter = await sendPostcard(
+        // Create letter via Postgrid
+        const letter = await createLetter(
           card.title,
           card.content,
           createContactFromAddress(fromContact),
           createContactFromAddress(toContact)
         );
+
+        // send
 
         // Record the send
         const send = await db
